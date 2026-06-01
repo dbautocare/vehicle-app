@@ -11,7 +11,11 @@ body{font-family:Arial,sans-serif;background:linear-gradient(135deg,#111827,#1f2
 <body>
 <div class="container">
 <h1>Vehicle Valuation</h1><div class="subtitle">MOT-powered appraisal and buying decision tool</div>
-<input id="registration" placeholder="Registration"><input id="vin" placeholder="VIN / chassis number"><button onclick="autoFillMotDetails()">Auto-fill last MOT mileage and MOT length</button>
+<input id="registration" placeholder="Registration"><input id="vin" placeholder="VIN / chassis number">
+
+<button onclick="autoFillMotDetails()">Auto-fill from Reg</button>
+
+<button onclick="autoFillVinDetails()">Decode VIN</button>
     <div id="vehicleInfo" class="result-card"></div>
 <div class="grid"><input id="mileage" type="number" placeholder="Current Mileage"><input id="lastMotMileage" type="text" placeholder="Mileage on last MOT" readonly></div><input id="lastMotDate" type="text" placeholder="Last MOT date" readonly>
 <h3>Desirable Spec Options</h3><div class="spec-grid" id="specGrid"></div><textarea id="extraSpec" placeholder="Any other spec not listed above"></textarea>
@@ -103,7 +107,63 @@ async function autoFillMotDetails() {
         alert("Could not auto-fill vehicle details");
 
     }
+async function autoFillVinDetails(){
 
+    const vin=document.getElementById("vin").value.trim();
+
+    if(!vin){
+
+        alert("Please enter a VIN first");
+
+        return;
+
+    }
+
+    try{
+
+        const r=await fetch(`/api/vin/${vin}`);
+
+        const d=await r.json();
+
+        if(!d.valid){
+
+            alert(d.error || "Invalid VIN");
+
+            return;
+
+        }
+
+        const vehicleInfoBox=document.getElementById("vehicleInfo");
+
+        if(vehicleInfoBox){
+
+            vehicleInfoBox.innerHTML=`
+
+                <strong>${d.make || "Unknown"} ${d.model || ""} ${d.year || ""}</strong><br>
+
+                Fuel: ${d.fuel || "Unknown"}<br>
+
+                Engine: ${d.engine ? d.engine+"L" : "Unknown"}<br>
+
+                Body: ${d.bodyClass || "Unknown"}<br>
+
+                Transmission: ${d.transmission || "Unknown"}
+
+            `;
+
+        }
+
+        alert("VIN details decoded");
+
+    }catch(e){
+
+        console.error(e);
+
+        alert("Could not decode VIN");
+
+    }
+
+}
 }function listHtml(arr){return(arr&&arr.length)?arr.map(x=>`<li>${x}</li>`).join(""):"<li>None recorded</li>"}
 function buildMotAnalysisHtml(a){if(!a)return"";let c=a.motCategories;let cls=a.motRiskLevel==="High"?"bad":a.motRiskLevel==="Medium"?"warning":"good";return`<div class="card ${cls}"><h3>Automatic MOT Risk Scoring</h3><div class="score">${a.motRiskScore} / 100</div><p><strong>Risk Level:</strong> ${a.motRiskLevel}</p><ul>${listHtml(a.motRiskNotes)}</ul></div><div class="card"><h3>Mileage Anomaly Detection</h3><ul>${a.mileageAnomalies.length?a.mileageAnomalies.map(x=>`<li>${x}</li>`).join(""):"<li>No mileage anomalies detected</li>"}</ul></div><div class="card"><h3>Auto MOT Categorisation</h3><span class="badge">Corrosion: ${c.corrosion}</span><span class="badge">Tyres: ${c.tyres}</span><span class="badge">Brakes: ${c.brakes}</span><span class="badge">Suspension: ${c.suspension}</span><span class="badge">Lights: ${c.lights}</span><span class="badge">Emissions: ${c.emissions}</span></div><div class="card"><h3>Likely Retail Speed</h3><div class="score">${a.likelyRetailSpeedScore} / 100</div><p><strong>${a.likelyRetailSpeed}</strong></p></div>`}
 function buildSpecAnalysisHtml(a){if(!a)return"";return`<div class="card good"><h3>Spec Scoring</h3><div class="score">${a.specScore} / 35</div><p><strong>Value added:</strong> £${a.specValueAdjustment}</p><ul>${listHtml(a.specNotes)}</ul></div>`}
