@@ -100,15 +100,17 @@ async function autoFillMotDetails() {
 
         alert("Vehicle details, last MOT mileage, MOT date and MOT length filled");
 
-    } catch (e) {
+   } catch (e) {
 
-        console.error(e);
+    console.error(e);
 
-        alert("Could not auto-fill vehicle details");
+    alert("Could not auto-fill vehicle details");
 
-    }
-async function autoFillVinDetails(){
+}
 
+}  // closes autoFillMotDetails
+
+async function autoFillVinDetails() {
     const vin=document.getElementById("vin").value.trim();
 
     if(!vin){
