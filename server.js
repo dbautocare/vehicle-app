@@ -270,17 +270,7 @@ async function searchEbayVehicles(query) {
 
     }));
 
-   const carListings = listings.filter(item =>
-
-    item.price > 500 &&
-
-    item.price < 100000 &&
-
-    !item.title.toLowerCase().includes("brochure") &&
-
-    !item.title.toLowerCase().includes("keyring")
-
-);
+const carListings = listings;
 
     const prices = carListings.map(item => item.price);
 
