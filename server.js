@@ -804,13 +804,60 @@ app.post("/vehicle", async (req, res) => {
 
         };
 
-        const ebayQuery =
+       const ebayQuery =
 
-`${vehicle.make} ${vehicle.model} ${vehicle.year} ${vehicle.fuel} ${mileage || ""} miles ${spec || ""}`;
+`${vehicle.make} ${vehicle.model} ${vehicle.year} ${vehicle.fuel} ${spec || ""}`;
+
+const ebayData = await searchEbayVehicles(ebayQuery);
+
+// Filter similar mileage vehicles
+
+const mileageTolerance = 20000;
+
+const filteredListings = ebayData.listings.filter(item => {
+
+    const title = (item.title || "").toLowerCase();
+
+    const mileageMatch =
+
+        title.match(/(\d{1,3}[, ]?\d{3})\s*miles/i) ||
+
+        title.match(/(\d{1,3}[, ]?\d{3})\s*mi/i);
+
+    if (!mileageMatch) return true;
+
+    const listingMileage =
+
+        parseInt(mileageMatch[1].replace(/[,\s]/g, ""));
+
+    return Math.abs(listingMileage - Number(mileage || 0))
+
+        <= mileageTolerance;
+
+});
+
+const marketListings = filteredListings;
+
+const filteredPrices =
+
+    filteredListings.map(x => Number(x.price)).filter(Boolean);
+
+let marketAverage =
+
+    filteredPrices.length
+
+        ? Math.round(
+
+            filteredPrices.reduce((a, b) => a + b, 0)
+
+            / filteredPrices.length
+
+          )
+
+        : (ebayData.averageAdvertisedPrice || 10000);
         const ebayData = await searchEbayVehicles(ebayQuery);
 
-        const marketListings = ebayData.listings;
-
+    
         let marketAverage = ebayData.averageAdvertisedPrice || 10000;
 
         let adjustments = [];
