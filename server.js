@@ -858,7 +858,7 @@ let marketAverage =
         
 
     
-        let marketAverage = ebayData.averageAdvertisedPrice || 10000;
+
 
         let adjustments = [];
 
