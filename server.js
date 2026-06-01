@@ -270,23 +270,17 @@ async function searchEbayVehicles(query) {
 
     }));
 
-    const carListings = listings.filter(item =>
+   const carListings = listings.filter(item =>
 
-        item.price > 500 &&
+    item.price > 500 &&
 
-        item.price < 100000 &&
+    item.price < 100000 &&
 
-        !item.title.toLowerCase().includes("manual") &&
+    !item.title.toLowerCase().includes("brochure") &&
 
-        !item.title.toLowerCase().includes("brochure") &&
+    !item.title.toLowerCase().includes("keyring")
 
-        !item.title.toLowerCase().includes("keyring") &&
-
-        !item.title.toLowerCase().includes("wheel") &&
-
-        !item.title.toLowerCase().includes("part")
-
-    );
+);
 
     const prices = carListings.map(item => item.price);
 
