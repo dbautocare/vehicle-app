@@ -855,7 +855,7 @@ let marketAverage =
           )
 
         : (ebayData.averageAdvertisedPrice || 10000);
-        const ebayData = await searchEbayVehicles(ebayQuery);
+        
 
     
         let marketAverage = ebayData.averageAdvertisedPrice || 10000;
