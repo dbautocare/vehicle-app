@@ -23,8 +23,87 @@ body{font-family:Arial,sans-serif;background:linear-gradient(135deg,#111827,#1f2
 let lastValuation=null;const specs=["Air Conditioning","Climate Control","Electric Windows","Heated Front Seats","Heated Rear Seats","Cooled Front Seats","Cooled Rear Seats","Apple CarPlay","Android Auto","Alloy Wheels","Cruise Control","Adaptive Cruise Control","Lane Assist","Blind Spot Monitoring","Upgraded Sound System","Harman Kardon","Pan Roof","Sun Roof","Pro Nav","360 Camera","Reverse Camera","Parking Sensors","Electric Tailgate","Keyless Entry","Keyless Start","Digital Dash","Head Up Display","Memory Seats","Electric Seats","Leather Seats","Massage Seats","Wireless Charging","LED Headlights","Matrix LED Headlights","Tow Bar"];
 document.getElementById("specGrid").innerHTML=specs.map(s=>`<label class="spec-option"><input type="checkbox" class="specCheck" value="${s}"> ${s}</label>`).join("");
 function formatDate(d){if(!d)return"Not available";return new Date(d).toLocaleDateString("en-GB")}function normaliseMotData(d){return Array.isArray(d)?(d[0]||null):(d||null)}function getSelectedSpec(){let checked=Array.from(document.querySelectorAll(".specCheck:checked")).map(b=>b.value);let extra=document.getElementById("extraSpec").value.trim();if(extra)checked.push(extra);return checked.join(", ")}function setMotLengthFromExpiry(expiryDate){const s=document.getElementById("motLength");if(!expiryDate){s.value="none";return}const days=Math.ceil((new Date(expiryDate)-new Date())/(1000*60*60*24));if(days<=0)s.value="none";else if(days<=90)s.value="short";else s.value="long"}
-async function autoFillMotDetails(){const reg=document.getElementById("registration").value.trim();if(!reg){alert("Please enter a registration first");return}try{const r=await fetch(`/api/mot/${reg}`);let m=normaliseMotData(await r.json());if(!m||!m.motTests||!m.motTests.length){alert("No MOT history found");return}const latest=m.motTests[0];document.getElementById("lastMotMileage").value=`${latest.odometerValue||""} ${latest.odometerUnit||"mi"}`;document.getElementById("lastMotDate").value=`Last MOT date: ${formatDate(latest.completedDate)}`;setMotLengthFromExpiry(latest.expiryDate);alert("Last MOT mileage, MOT date and MOT length filled")}catch(e){console.error(e);alert("Could not auto-fill MOT details")}}
-function listHtml(arr){return(arr&&arr.length)?arr.map(x=>`<li>${x}</li>`).join(""):"<li>None recorded</li>"}
+async function autoFillMotDetails() {
+
+    const reg = document.getElementById("registration").value.trim();
+
+    if (!reg) {
+
+        alert("Please enter a registration first");
+
+        return;
+
+    }
+
+    try {
+
+        const [motResponse, dvlaResponse] = await Promise.all([
+
+            fetch(`/api/mot/${reg}`),
+
+            fetch(`/api/dvla/${reg}`)
+
+        ]);
+
+        let m = normaliseMotData(await motResponse.json());
+
+        let d = await dvlaResponse.json();
+
+        if (d) {
+
+            const vehicleSummary =
+
+                `${d.make || "Unknown"} ${d.yearOfManufacture || ""} ${d.fuelType || ""} ${d.colour || ""} ${d.engineCapacity ? d.engineCapacity + "cc" : ""}`;
+
+            const vehicleInfoBox = document.getElementById("vehicleInfo");
+
+            if (vehicleInfoBox) {
+
+                vehicleInfoBox.innerHTML = `
+
+                    <strong>${vehicleSummary}</strong><br>
+
+                    Tax: ${d.taxStatus || "Unknown"}<br>
+
+                    MOT: ${d.motStatus || "Unknown"}
+
+                `;
+
+            }
+
+        }
+
+        if (!m || !m.motTests || !m.motTests.length) {
+
+            alert("DVLA details found, but no MOT history found");
+
+            return;
+
+        }
+
+        const latest = m.motTests[0];
+
+        document.getElementById("lastMotMileage").value =
+
+            `${latest.odometerValue || ""} ${latest.odometerUnit || "mi"}`;
+
+        document.getElementById("lastMotDate").value =
+
+            `Last MOT date: ${formatDate(latest.completedDate)}`;
+
+        setMotLengthFromExpiry(latest.expiryDate);
+
+        alert("Vehicle details, last MOT mileage, MOT date and MOT length filled");
+
+    } catch (e) {
+
+        console.error(e);
+
+        alert("Could not auto-fill vehicle details");
+
+    }
+
+}function listHtml(arr){return(arr&&arr.length)?arr.map(x=>`<li>${x}</li>`).join(""):"<li>None recorded</li>"}
 function buildMotAnalysisHtml(a){if(!a)return"";let c=a.motCategories;let cls=a.motRiskLevel==="High"?"bad":a.motRiskLevel==="Medium"?"warning":"good";return`<div class="card ${cls}"><h3>Automatic MOT Risk Scoring</h3><div class="score">${a.motRiskScore} / 100</div><p><strong>Risk Level:</strong> ${a.motRiskLevel}</p><ul>${listHtml(a.motRiskNotes)}</ul></div><div class="card"><h3>Mileage Anomaly Detection</h3><ul>${a.mileageAnomalies.length?a.mileageAnomalies.map(x=>`<li>${x}</li>`).join(""):"<li>No mileage anomalies detected</li>"}</ul></div><div class="card"><h3>Auto MOT Categorisation</h3><span class="badge">Corrosion: ${c.corrosion}</span><span class="badge">Tyres: ${c.tyres}</span><span class="badge">Brakes: ${c.brakes}</span><span class="badge">Suspension: ${c.suspension}</span><span class="badge">Lights: ${c.lights}</span><span class="badge">Emissions: ${c.emissions}</span></div><div class="card"><h3>Likely Retail Speed</h3><div class="score">${a.likelyRetailSpeedScore} / 100</div><p><strong>${a.likelyRetailSpeed}</strong></p></div>`}
 function buildSpecAnalysisHtml(a){if(!a)return"";return`<div class="card good"><h3>Spec Scoring</h3><div class="score">${a.specScore} / 35</div><p><strong>Value added:</strong> £${a.specValueAdjustment}</p><ul>${listHtml(a.specNotes)}</ul></div>`}
 function buildMotHtml(m){m=normaliseMotData(m);if(!m||!m.motTests||!m.motTests.length)return`<div class="card warning"><h3>MOT History</h3><p>No MOT history found.</p></div>`;let tests=m.motTests,latest=tests[0],days=latest.expiryDate?Math.ceil((new Date(latest.expiryDate)-new Date())/(1000*60*60*24)):null,w="";if(days!==null){if(days<=0)w=`<div class="card bad"><strong>MOT expired</strong></div>`;else if(days<=30)w=`<div class="card bad"><strong>MOT expires very soon:</strong> ${days} days remaining</div>`;else if(days<=90)w=`<div class="card warning"><strong>Short MOT:</strong> ${days} days remaining</div>`;else w=`<div class="card good"><strong>MOT length good:</strong> ${days} days remaining</div>`}let html=`${w}<div class="card"><h3>MOT History</h3><div class="small">Registration: ${m.registration||"Unknown"}<br>Make: ${m.make||"Unknown"}<br>Model: ${m.model||"Unknown"}<br>Fuel: ${m.fuelType||"Unknown"}<br>Colour: ${m.primaryColour||"Unknown"}<br>First Used: ${formatDate(m.firstUsedDate)}</div><div class="value">Current MOT Expiry: ${formatDate(latest.expiryDate)}</div><div class="value">Last Test: ${latest.testResult}</div><div class="small">Last MOT mileage: ${latest.odometerValue||"Unknown"} ${latest.odometerUnit||""}</div></div>`;tests.slice(0,8).forEach(t=>{let defects=t.defects&&t.defects.length?t.defects.map(d=>`<div class="defect"><strong>${d.type||"Defect"}:</strong> ${d.text||""}</div>`).join(""):`<div class="small">No defects recorded</div>`;html+=`<div class="card ${t.testResult==="PASSED"?"mot-pass":"mot-fail"}"><h4>${formatDate(t.completedDate)} - ${t.testResult}</h4><div class="small">Mileage: ${t.odometerValue||"Unknown"} ${t.odometerUnit||""}<br>Expiry: ${formatDate(t.expiryDate)}</div>${defects}</div>`});return html}
