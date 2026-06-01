@@ -212,11 +212,13 @@ async function searchEbayVehicles(query) {
 
     const params = new URLSearchParams({
 
-        q: query,
+    q: query,
 
-        limit: "20"
+    limit: "20",
 
-    });
+    category_ids: "9801"
+
+});
 
     const url = `https://api.ebay.com/buy/browse/v1/item_summary/search?${params.toString()}`;
 
@@ -270,7 +272,13 @@ async function searchEbayVehicles(query) {
 
     }));
 
-const carListings = listings;
+const carListings = listings.filter(item =>
+
+    item.price > 1000 &&
+
+    item.price < 100000
+
+);
 
     const prices = carListings.map(item => item.price);
 
