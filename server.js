@@ -767,7 +767,27 @@ app.get("/api/dvla/:registration", async (req, res) => {
     }
 
 });
+app.get("/api/vin/:vin", async (req, res) => {
 
+    try {
+
+        const vinData = await decodeVinWithNhtsa(req.params.vin);
+
+        res.json(vinData);
+
+    } catch (err) {
+
+        res.status(500).json({
+
+            error: "VIN decode failed",
+
+            details: err.message
+
+        });
+
+    }
+
+});
 app.get("/api/ebay-search", async (req, res) => {
 
     try {
