@@ -125,13 +125,13 @@ async function autoFillVinDetails(){
 
         const d=await r.json();
 
-        if(!d.valid){
+        if(d.error){
 
-            alert(d.error || "Invalid VIN");
+    alert(d.error);
 
-            return;
+    return;
 
-        }
+}
 
         const vehicleInfoBox=document.getElementById("vehicleInfo");
 
