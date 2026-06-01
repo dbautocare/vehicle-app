@@ -210,11 +210,15 @@ async function searchEbayVehicles(query) {
 
     const token = await getEbayAccessToken();
 
-    const url =
+    const params = new URLSearchParams({
 
-        `https://api.ebay.com/buy/browse/v1/item_summary/search?q=${encodeURIComponent(query)}` +
+        q: query,
 
-        `&limit=20&filter=itemLocationCountry:GB`;
+        limit: "20"
+
+    });
+
+    const url = `https://api.ebay.com/buy/browse/v1/item_summary/search?${params.toString()}`;
 
     const response = await fetch(url, {
 
@@ -238,31 +242,53 @@ async function searchEbayVehicles(query) {
 
         console.error("eBay search error:", data);
 
-        return { listings: [], averageAdvertisedPrice: null };
+        return {
+
+            listings: [],
+
+            averageAdvertisedPrice: null,
+
+            ebayError: data
+
+        };
 
     }
 
-    const listings = (data.itemSummaries || [])
+    const listings = (data.itemSummaries || []).map(item => ({
 
-        .map(item => ({
+        title: item.title,
 
-            title: item.title,
+        price: Number(item.price?.value || 0),
 
-            price: Number(item.price?.value || 0),
+        currency: item.price?.currency || "GBP",
 
-            currency: item.price?.currency || "GBP",
+        condition: item.condition || "",
 
-            condition: item.condition || "",
+        url: item.itemWebUrl || "",
 
-            url: item.itemWebUrl || "",
+        image: item.image?.imageUrl || ""
 
-            image: item.image?.imageUrl || ""
+    }));
 
-        }))
+    const carListings = listings.filter(item =>
 
-        .filter(item => item.price > 500);
+        item.price > 500 &&
 
-    const prices = listings.map(item => item.price);
+        item.price < 100000 &&
+
+        !item.title.toLowerCase().includes("manual") &&
+
+        !item.title.toLowerCase().includes("brochure") &&
+
+        !item.title.toLowerCase().includes("keyring") &&
+
+        !item.title.toLowerCase().includes("wheel") &&
+
+        !item.title.toLowerCase().includes("part")
+
+    );
+
+    const prices = carListings.map(item => item.price);
 
     const averageAdvertisedPrice = prices.length
 
@@ -270,7 +296,17 @@ async function searchEbayVehicles(query) {
 
         : null;
 
-    return { listings, averageAdvertisedPrice };
+    return {
+
+        query,
+
+        totalFromEbay: data.total || 0,
+
+        listings: carListings,
+
+        averageAdvertisedPrice
+
+    };
 
 }
 
