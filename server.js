@@ -804,8 +804,9 @@ app.post("/vehicle", async (req, res) => {
 
         };
 
-        const ebayQuery = `${vehicle.make} ${vehicle.model} ${vehicle.year}`;
+        const ebayQuery =
 
+`${vehicle.make} ${vehicle.model} ${vehicle.year} ${vehicle.fuel} ${mileage || ""} miles ${spec || ""}`;
         const ebayData = await searchEbayVehicles(ebayQuery);
 
         const marketListings = ebayData.listings;
