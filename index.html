@@ -12,6 +12,7 @@ body{font-family:Arial,sans-serif;background:linear-gradient(135deg,#111827,#1f2
 <div class="container">
 <h1>Vehicle Valuation</h1><div class="subtitle">MOT-powered appraisal and buying decision tool</div>
 <input id="registration" placeholder="Registration"><input id="vin" placeholder="VIN / chassis number"><button onclick="autoFillMotDetails()">Auto-fill last MOT mileage and MOT length</button>
+    <div id="vehicleInfo" class="result-card"></div>
 <div class="grid"><input id="mileage" type="number" placeholder="Current Mileage"><input id="lastMotMileage" type="text" placeholder="Mileage on last MOT" readonly></div><input id="lastMotDate" type="text" placeholder="Last MOT date" readonly>
 <h3>Desirable Spec Options</h3><div class="spec-grid" id="specGrid"></div><textarea id="extraSpec" placeholder="Any other spec not listed above"></textarea>
 <select id="condition"><option value="poor">Poor Overall Condition</option><option value="average">Average Overall Condition</option><option value="good" selected>Good Overall Condition</option><option value="excellent">Excellent Overall Condition</option></select>
