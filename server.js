@@ -33,7 +33,65 @@ function cleanRegistration(registration) {
     return String(registration || "").replace(/\s/g, "").toUpperCase();
 
 }
+async function decodeVinWithNhtsa(vin) {
 
+    const cleanVin = String(vin || "").toUpperCase().replace(/\s/g, "");
+
+    if (!cleanVin || cleanVin.length !== 17 || /[IOQ]/.test(cleanVin)) {
+
+        return {
+
+            valid: false,
+
+            error: "VIN should be 17 characters and must not contain I, O or Q"
+
+        };
+
+    }
+
+    const response = await fetch(
+
+        `https://vpic.nhtsa.dot.gov/api/vehicles/DecodeVinExtended/${cleanVin}?format=json`
+
+    );
+
+    const data = await response.json();
+
+    const getValue = label => {
+
+        const item = data.Results.find(x => x.Variable === label);
+
+        return item?.Value || "";
+
+    };
+
+    return {
+
+        valid: true,
+
+        vin: cleanVin,
+
+        make: getValue("Make"),
+
+        model: getValue("Model"),
+
+        year: getValue("Model Year"),
+
+        fuel: getValue("Fuel Type - Primary"),
+
+        engine: getValue("Displacement (L)"),
+
+        bodyClass: getValue("Body Class"),
+
+        transmission: getValue("Transmission Style"),
+
+        doors: getValue("Doors"),
+
+        raw: data.Results
+
+    };
+
+}
 async function getMotAccessToken() {
 
     if (cachedMotToken && Date.now() < motTokenExpiry) return cachedMotToken;
