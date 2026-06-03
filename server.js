@@ -269,95 +269,166 @@ async function searchEbayVehicles(query) {
     const token = await getEbayAccessToken();
 
     const params = new URLSearchParams({
-
-    q: query,
-
-    limit: "20",
-
-    category_ids: "9801"
-
-});
+        q: query,
+        limit: "50",
+        category_ids: "9801",
+        filter: "buyingOptions:{FIXED_PRICE}"
+    });
 
     const url = `https://api.ebay.com/buy/browse/v1/item_summary/search?${params.toString()}`;
 
     const response = await fetch(url, {
-
         method: "GET",
-
         headers: {
-
             Authorization: `Bearer ${token}`,
-
             "X-EBAY-C-MARKETPLACE-ID": "EBAY_GB",
-
             Accept: "application/json"
-
         }
-
     });
 
     const data = await response.json();
 
     if (!response.ok) {
-
         console.error("eBay search error:", data);
-
         return {
-
+            query,
+            totalFromEbay: 0,
             listings: [],
-
+            marketStats: buildMarketStats([]),
             averageAdvertisedPrice: null,
-
             ebayError: data
-
         };
-
     }
 
     const listings = (data.itemSummaries || []).map(item => ({
-
         title: item.title,
-
         price: Number(item.price?.value || 0),
-
         currency: item.price?.currency || "GBP",
-
         condition: item.condition || "",
-
         url: item.itemWebUrl || "",
-
         image: item.image?.imageUrl || ""
-
     }));
 
-const carListings = listings.filter(item =>
+    const carListings = listings.filter(item =>
+        item.price > 1000 &&
+        item.price < 100000 &&
+        item.currency === "GBP"
+    );
 
-    item.price > 1000 &&
-
-    item.price < 100000
-
-);
-
-    const prices = carListings.map(item => item.price);
-
-    const averageAdvertisedPrice = prices.length
-
-        ? Math.round(prices.reduce((a, b) => a + b, 0) / prices.length)
-
-        : null;
+    const marketStats = buildMarketStats(carListings);
 
     return {
-
         query,
-
         totalFromEbay: data.total || 0,
-
         listings: carListings,
-
-        averageAdvertisedPrice
-
+        marketStats,
+        averageAdvertisedPrice: marketStats.average
     };
+}
 
+function buildMarketStats(listings) {
+    const prices = (listings || [])
+        .map(item => Number(item.price))
+        .filter(price => price > 1000 && price < 100000)
+        .sort((a, b) => a - b);
+
+    if (!prices.length) {
+        return {
+            count: 0,
+            low: null,
+            high: null,
+            average: null,
+            median: null,
+            confidenceScore: 15,
+            confidenceLabel: "Low",
+            confidenceReason: "No strong eBay comparables found"
+        };
+    }
+
+    const average = Math.round(prices.reduce((a, b) => a + b, 0) / prices.length);
+    const middle = Math.floor(prices.length / 2);
+    const median = prices.length % 2
+        ? prices[middle]
+        : Math.round((prices[middle - 1] + prices[middle]) / 2);
+
+    let confidenceScore = 35;
+    if (prices.length >= 10) confidenceScore += 20;
+    if (prices.length >= 20) confidenceScore += 20;
+    if (prices.length >= 35) confidenceScore += 10;
+
+    const spread = prices[prices.length - 1] - prices[0];
+    const spreadPercent = average ? spread / average : 1;
+    if (spreadPercent < 0.35) confidenceScore += 15;
+    else if (spreadPercent > 0.75) confidenceScore -= 10;
+
+    confidenceScore = Math.max(0, Math.min(100, confidenceScore));
+
+    let confidenceLabel = "Low";
+    if (confidenceScore >= 75) confidenceLabel = "High";
+    else if (confidenceScore >= 50) confidenceLabel = "Medium";
+
+    return {
+        count: prices.length,
+        low: prices[0],
+        high: prices[prices.length - 1],
+        average,
+        median,
+        confidenceScore,
+        confidenceLabel,
+        confidenceReason: `${prices.length} comparable advertised eBay listings analysed`
+    };
+}
+
+function buildAiPricing({ marketStats, adjustedRetailValue, tradeValue, buyScore, desirabilityScore, motAnalysis, estimatedPrepTotal }) {
+    const base = marketStats?.median || marketStats?.average || adjustedRetailValue;
+
+    let retail = Number(adjustedRetailValue || base || 0);
+    let quickSale = Math.round(retail * 0.96);
+    let stretchPrice = Math.round(retail * 1.04);
+    let maxBid = Math.round(tradeValue - estimatedPrepTotal);
+
+    const reasons = [];
+
+    if (marketStats?.confidenceLabel === "High") reasons.push("Good number of eBay comparables found, so pricing confidence is higher.");
+    if (marketStats?.confidenceLabel === "Medium") reasons.push("Some eBay comparables found, but still check Auto Trader/Facebook manually before buying.");
+    if (!marketStats || marketStats.confidenceLabel === "Low") reasons.push("Low comparable count, so treat this as a guide only.");
+
+    if (buyScore >= 75) {
+        stretchPrice = Math.round(stretchPrice * 1.01);
+        reasons.push("Strong buy score supports pricing near the upper end if condition is genuinely good.");
+    }
+
+    if (desirabilityScore < 55) {
+        retail = Math.round(retail * 0.98);
+        quickSale = Math.round(quickSale * 0.97);
+        reasons.push("Lower desirability score suggests pricing aggressively to avoid it sitting in stock.");
+    }
+
+    if (motAnalysis?.motRiskLevel === "High") {
+        retail = Math.round(retail * 0.97);
+        quickSale = Math.round(quickSale * 0.96);
+        reasons.push("High MOT risk reduces recommended retail pricing.");
+    }
+
+    if (estimatedPrepTotal > 700) {
+        maxBid = Math.round(maxBid - 300);
+        reasons.push("Higher prep allowance reduces the recommended maximum bid.");
+    }
+
+    retail = Math.max(500, Math.round(retail));
+    quickSale = Math.max(500, Math.round(quickSale));
+    stretchPrice = Math.max(retail, Math.round(stretchPrice));
+    maxBid = Math.max(0, Math.round(maxBid));
+
+    return {
+        recommendedRetail: retail,
+        quickSalePrice: quickSale,
+        stretchAdvertisedPrice: stretchPrice,
+        maxBidPrice: maxBid,
+        confidenceScore: marketStats?.confidenceScore || 15,
+        confidenceLabel: marketStats?.confidenceLabel || "Low",
+        reasoning: reasons
+    };
 }
 
 function analyseSpec(spec) {
@@ -916,23 +987,9 @@ const filteredListings = ebayData.listings.filter(item => {
 
 const marketListings = filteredListings;
 
-const filteredPrices =
+const marketStats = buildMarketStats(filteredListings);
 
-    filteredListings.map(x => Number(x.price)).filter(Boolean);
-
-let marketAverage =
-
-    filteredPrices.length
-
-        ? Math.round(
-
-            filteredPrices.reduce((a, b) => a + b, 0)
-
-            / filteredPrices.length
-
-          )
-
-        : (ebayData.averageAdvertisedPrice || 10000);
+let marketAverage = marketStats.median || marketStats.average || ebayData.averageAdvertisedPrice || 10000;
         
 
     
@@ -1310,6 +1367,16 @@ let marketAverage =
 
         const tradeValue = Math.round(retailValue * 0.88);
 
+        const aiPricing = buildAiPricing({
+            marketStats,
+            adjustedRetailValue: retailValue,
+            tradeValue,
+            buyScore,
+            desirabilityScore,
+            motAnalysis,
+            estimatedPrepTotal
+        });
+
         let buyAdvice = "Proceed with caution.";
 
         if (buyScore >= 80) buyAdvice = "Strong buy if the purchase price leaves enough margin.";
@@ -1377,6 +1444,10 @@ let marketAverage =
             ebayData,
 
             marketListings,
+
+            marketStats,
+
+            aiPricing,
 
             marketAverage,
 
