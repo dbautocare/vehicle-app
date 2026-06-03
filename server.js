@@ -431,6 +431,100 @@ function buildAiPricing({ marketStats, adjustedRetailValue, tradeValue, buyScore
     };
 }
 
+
+
+function buildVehicleSpecificCommonProblems({ vehicle, mileage, motAnalysis, notes }) {
+
+    const make = String(vehicle?.make || "").toLowerCase();
+    const model = String(vehicle?.model || "").toLowerCase();
+    const fuel = String(vehicle?.fuel || "").toLowerCase();
+    const engine = String(vehicle?.engine || "").toLowerCase();
+    const combined = `${make} ${model} ${fuel} ${engine} ${String(notes || "").toLowerCase()}`;
+    const mileageNumber = Number(mileage || 0);
+    const problems = [];
+
+    const add = text => {
+        if (text && !problems.includes(text)) problems.push(text);
+    };
+
+    add("Check for warning lights and scan for stored fault codes before buying.");
+    add("Check service history, correct oil grade, and evidence of regular maintenance.");
+
+    if (fuel.includes("hybrid") || fuel.includes("electric") || fuel.includes("phev") || combined.includes("330e") || combined.includes("530e") || combined.includes("prius")) {
+        add("Check high-voltage battery health, charging operation, charging cable, and any hybrid/electric drivetrain warnings.");
+        add("Check petrol engine cold start as hybrids can hide engine running issues during short tests.");
+    }
+
+    if (fuel.includes("diesel")) {
+        add("Check DPF regeneration history, soot loading, and signs of blocked DPF from short journeys.");
+        add("Check EGR system, turbo boost control, intercooler pipes, and injector correction values.");
+        if (mileageNumber > 80000) add("Check dual-mass flywheel/clutch wear or automatic gearbox behaviour at higher mileage.");
+    }
+
+    if (fuel.includes("petrol")) {
+        add("Check timing belt/chain history, coolant leaks, misfires, coil packs, and oil consumption.");
+        if (combined.includes("turbo") || combined.includes("ecoboost") || combined.includes("tsi") || combined.includes("tfsi")) {
+            add("Check turbo boost, smoke under load, oil leaks, and boost pipe condition.");
+        }
+    }
+
+    if (make.includes("ford") && (model.includes("fiesta") || model.includes("focus")) && combined.includes("ecoboost")) {
+        add("Ford EcoBoost: confirm wet timing belt/oil pump belt replacement history and check for oil pressure or belt debris issues.");
+        add("Ford EcoBoost: check coolant loss, thermostat housing, turbo oil leaks, and rough idle/misfire.");
+    }
+
+    if (make.includes("ford") && (model.includes("fiesta") || model.includes("focus")) && combined.includes("automatic")) {
+        add("Ford automatic: check Powershift/automatic gearbox engagement, shuddering, delayed drive, and service history.");
+    }
+
+    if ((make.includes("bmw") || combined.includes("mini")) && (combined.includes("b47") || fuel.includes("diesel") || model.includes("320d") || model.includes("118d") || model.includes("120d"))) {
+        add("BMW diesel: check timing chain noise, EGR/cooler recalls, DPF condition, swirl flaps, and turbo actuator operation.");
+    }
+
+    if (make.includes("bmw") && (combined.includes("330e") || combined.includes("530e") || fuel.includes("hybrid"))) {
+        add("BMW plug-in hybrid: check charging flap/port, charging cable, hybrid battery warranty, coolant system, and electric drive faults.");
+    }
+
+    if (make.includes("audi") || make.includes("volkswagen") || make.includes("seat") || make.includes("skoda")) {
+        add("VW/Audi group: check DSG/automatic gearbox service history, mechatronic behaviour, water pump/thermostat leaks, and electrical faults.");
+        if (fuel.includes("diesel")) add("VW/Audi diesel: check EGR, DPF, turbo actuator, injector balance, and AdBlue faults if fitted.");
+        if (combined.includes("tfsi") || combined.includes("tsi")) add("VW/Audi petrol turbo: check timing chain/belt history, oil consumption, PCV faults, and coolant leaks.");
+    }
+
+    if (make.includes("vauxhall") || make.includes("opel")) {
+        add("Vauxhall/Opel: check timing chain/belt history, coolant leaks, oil leaks, and gearbox/clutch operation.");
+        if (fuel.includes("diesel")) add("Vauxhall diesel: check EGR, DPF, turbo oil leaks, injector seals, and intercooler pipe condition.");
+    }
+
+    if (make.includes("peugeot") || make.includes("citroen") || make.includes("ds")) {
+        add("Peugeot/Citroen: check wet belt/timing belt history where applicable, AdBlue system, DPF, and electrical faults.");
+    }
+
+    if (make.includes("land rover") || make.includes("range rover") || model.includes("discovery")) {
+        add("Land Rover: check air suspension, coolant leaks, electrical faults, transfer box/diffs, and full diagnostic scan results.");
+        if (fuel.includes("diesel")) add("Land Rover diesel: check timing belts, turbo issues, EGR, DPF, inlet manifolds, and oil leaks.");
+    }
+
+    if (make.includes("nissan") && model.includes("qashqai")) {
+        add("Nissan Qashqai: check CVT gearbox if automatic, timing chain/belt history, suspension knocks, and electrical faults.");
+    }
+
+    if (motAnalysis?.motCategories?.corrosion > 0) add("MOT history shows corrosion: inspect sills, subframes, brake pipes, suspension mounts, and rear axle areas carefully.");
+    if (motAnalysis?.motCategories?.tyres > 0) add("MOT history shows tyre advisories: check tyre age, matching brands, alignment wear, and suspension geometry.");
+    if (motAnalysis?.motCategories?.brakes > 0) add("MOT history shows brake advisories: check discs, pads, calipers, brake pipes, and handbrake operation.");
+    if (motAnalysis?.motCategories?.suspension > 0) add("MOT history shows suspension issues: road test for knocks and check springs, arms, bushes, shocks, and wheel bearings.");
+    if (motAnalysis?.motCategories?.emissions > 0) add("MOT history shows emissions issues: check smoke, exhaust leaks, DPF/cat condition, lambda/NOx sensors, and engine running quality.");
+
+    if (mileageNumber > 100000) {
+        add("High mileage: check timing history, clutch/gearbox, suspension wear, oil leaks, cooling system, and proof of regular servicing.");
+    } else if (mileageNumber < 30000) {
+        add("Low mileage: check for long periods unused, perished tyres, brake corrosion, weak battery, and short-journey DPF issues on diesels.");
+    }
+
+    return problems.slice(0, 12);
+
+}
+
 function analyseSpec(spec) {
 
     const lower = (spec || "").toLowerCase();
@@ -1415,23 +1509,17 @@ let marketAverage = marketStats.median || marketStats.average || ebayData.averag
 
         });
 
-        const commonProblems = [
+        const commonProblems = buildVehicleSpecificCommonProblems({
 
-            "Check hybrid battery health and charging operation",
+            vehicle,
 
-            "Check cooling system and coolant leaks",
+            mileage,
 
-            "Check gearbox operation from cold and hot",
+            motAnalysis,
 
-            "Check suspension knocks and worn bushes",
+            notes
 
-            "Check brake wear, especially if the car has sat unused",
-
-            "Check for warning lights and stored fault codes",
-
-            "Check service history and correct oil changes"
-
-        ];
+        });
 
         res.json({
 
